@@ -1,0 +1,294 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --primary: oklch(0.28 0.05 164);
+  --primary-foreground: oklch(0.98 0.02 112);
+  --sidebar-primary: oklch(0.28 0.05 164);
+  --sidebar-primary-foreground: oklch(0.98 0.02 112);
+  --chart-1: oklch(0.75 0.13 112);
+  --chart-2: oklch(0.5 0.08 164);
+  --chart-3: oklch(0.65 0.1 190);
+  --chart-4: oklch(0.72 0.12 78);
+  --chart-5: oklch(0.45 0.08 164);
+  --radius: 0.65rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.235 0.015 65);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.015 65);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.015 65);
+  --secondary: oklch(0.98 0.001 286.375);
+  --secondary-foreground: oklch(0.4 0.015 65);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.141 0.005 285.823);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.65 0.1 112);
+  --sidebar: oklch(0.28 0.05 164);
+  --sidebar-foreground: oklch(0.98 0.01 112);
+  --sidebar-accent: oklch(0.35 0.06 164);
+  --sidebar-accent-foreground: oklch(0.98 0.01 112);
+  --sidebar-border: oklch(0.35 0.06 164);
+  --sidebar-ring: oklch(0.65 0.1 112);
+}
+
+.dark {
+  --primary: oklch(0.86 0.16 112);
+  --primary-foreground: oklch(0.2 0.04 164);
+  --sidebar-primary: oklch(0.86 0.16 112);
+  --sidebar-primary-foreground: oklch(0.2 0.04 164);
+  --background: oklch(0.18 0.025 164);
+  --foreground: oklch(0.93 0.02 112);
+  --card: oklch(0.23 0.025 164);
+  --card-foreground: oklch(0.93 0.02 112);
+  --popover: oklch(0.25 0.03 164);
+  --popover-foreground: oklch(0.93 0.02 112);
+  --secondary: oklch(0.28 0.03 164);
+  --secondary-foreground: oklch(0.8 0.025 112);
+  --muted: oklch(0.28 0.025 164);
+  --muted-foreground: oklch(0.72 0.025 112);
+  --accent: oklch(0.34 0.04 164);
+  --accent-foreground: oklch(0.95 0.02 112);
+  --destructive: oklch(0.68 0.17 25);
+  --destructive-foreground: oklch(0.98 0.01 112);
+  --border: oklch(0.95 0.02 112 / 14%);
+  --input: oklch(0.95 0.02 112 / 18%);
+  --ring: oklch(0.86 0.16 112);
+  --chart-1: oklch(0.86 0.16 112);
+  --chart-2: oklch(0.62 0.1 164);
+  --chart-3: oklch(0.7 0.12 190);
+  --chart-4: oklch(0.76 0.12 78);
+  --chart-5: oklch(0.55 0.09 164);
+  --sidebar: oklch(0.13 0.025 164);
+  --sidebar-foreground: oklch(0.93 0.02 112);
+  --sidebar-accent: oklch(0.28 0.04 164);
+  --sidebar-accent-foreground: oklch(0.95 0.02 112);
+  --sidebar-border: oklch(0.95 0.02 112 / 12%);
+  --sidebar-ring: oklch(0.86 0.16 112);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+}
+
+@layer components {
+  .dark [class~="bg-[#f5f7f2]"] { background-color: #182923 !important; }
+  .dark [class~="bg-[#f5f8f2]"] { background-color: #24382f !important; }
+  .dark [class~="bg-[#f1f7dd]"] { background-color: #354329 !important; }
+  .dark [class~="bg-[#edf1eb]"] { background-color: #30453b !important; }
+  .dark [class~="bg-[#e8eef8]"] { background-color: #293d52 !important; }
+  .dark [class~="bg-[#e3f3e8]"] { background-color: #274334 !important; }
+  .dark [class~="bg-white"] { background-color: #22382f !important; }
+  .dark [class~="bg-white/95"] { background-color: rgb(34 56 47 / 95%) !important; }
+  .dark [class~="bg-white/90"] { background-color: rgb(24 41 35 / 90%) !important; }
+  .dark [class~="text-[#173a34]"] { color: #dceadf !important; }
+  .dark [class~="text-[#284b42]"] { color: #c1d8ca !important; }
+  .dark [class~="text-[#34574d]"] { color: #b4d0bf !important; }
+  .dark [class~="text-[#526d64]"] { color: #a8c1b2 !important; }
+  .dark [class~="text-[#526b4d]"] { color: #bdd28e !important; }
+  .dark [class~="text-[#58716b]"] { color: #9fb8aa !important; }
+  .dark [class~="text-[#627b72]"] { color: #a9c1b3 !important; }
+  .dark [class~="text-[#6d837b]"] { color: #a0b9ab !important; }
+  .dark [class~="text-[#708880]"] { color: #9db5a7 !important; }
+  .dark [class~="text-[#71867f]"] { color: #9eb7aa !important; }
+  .dark [class~="text-[#82948e]"] { color: #91aa9d !important; }
+  .dark [class~="text-[#879b93]"] { color: #9bb3a6 !important; }
+  .dark [class~="border-[#dce5dc]"] { border-color: #355247 !important; }
+  .dark [class~="border-[#cbd8cc]"] { border-color: #46665a !important; }
+  .dark [class~="border-[#edf1eb]"] { border-color: #30453b !important; }
+  .dark [class~="border-[#ccdc9b]"] { border-color: #667b36 !important; }
+  .dark [class~="bg-[#e8f1f5]"] { background-color: #294552 !important; }
+  .dark [class~="bg-[#f5f7f2]/90"] { background-color: rgb(24 41 35 / 90%) !important; }
+  .dark [class~="bg-[#d9f56a]"] { color: #173a34 !important; }
+  .dark [class~="bg-[#d9f56a]"] [class~="text-[#173a34]"],
+  .dark [class~="bg-[#d9f56a]"][class~="text-[#173a34]"] { color: #173a34 !important; }
+  .dark [class~="bg-[#f1f7dd]"] [class~="text-[#526b4d]"],
+  .dark [class~="bg-[#f1f7dd]"] [class~="text-[#304d2c]"],
+  .dark [class~="bg-[#f1f7dd]"] [class~="text-[#52694e]"] { color: #304d2c !important; }
+  .dark #theme-select,
+  .dark #mobile-theme-select { color: #173a34 !important; background-color: #dce8df !important; color-scheme: light; }
+  #theme-select,
+  #mobile-theme-select { transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+  #theme-select:hover,
+  #mobile-theme-select:hover { border-color: #9bad9a !important; box-shadow: 0 0 0 3px rgb(138 165 0 / 12%); }
+  .dark #theme-select:hover,
+  .dark #mobile-theme-select:hover { background-color: #e8f2eb !important; border-color: #8aa500 !important; box-shadow: 0 0 0 3px rgb(217 245 106 / 18%); }
+
+  /**
+   * Custom container utility that centers content and adds responsive padding.
+   *
+   * This overrides Tailwind's default container behavior to:
+   * - Auto-center content (mx-auto)
+   * - Add responsive horizontal padding
+   * - Set max-width for large screens
+   *
+   * Usage: <div className="container">...</div>
+   *
+   * For custom widths, use max-w-* utilities directly:
+   * <div className="max-w-6xl mx-auto px-4">...</div>
+   */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem; /* 16px - mobile padding */
+    padding-right: 1rem;
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem; /* 32px - desktop padding */
+      padding-right: 2rem;
+      max-width: 1280px; /* Standard content width */
+    }
+  }
+}
+
+/* Regras de impressão para geração de PDF limpo do Recibo e do Orçamento */
+@media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  body > * {
+    overflow: visible !important;
+  }
+
+  header, nav, footer, .no-print, [data-state="closed"] {
+    display: none !important;
+  }
+
+  [data-radix-portal],
+  [role="dialog"],
+  [data-state="open"] {
+    position: static !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .fixed.inset-0.bg-black\/80,
+  [data-state="open"] > div:first-child {
+    display: none !important;
+  }
+
+  button,
+  .dialog-footer,
+  [role="dialog"] button {
+    display: none !important;
+  }
+
+  #printable-receipt,
+  #printable-quote,
+  .printable-document {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #173a34 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  #printable-receipt *,
+  #printable-quote *,
+  .printable-document * {
+    visibility: visible !important;
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+

@@ -1,0 +1,91 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "openId": "dev-user-local",
+      "name": "Profissional Autônomo",
+      "email": "contato@meuautonomo.com.br",
+      "loginMethod": "local-dev",
+      "role": "admin",
+      "createdAt": "2026-09-28T13:30:39.767Z",
+      "updatedAt": "2026-09-28T13:30:39.767Z",
+      "lastSignedIn": "2026-09-28T13:30:39.767Z"
+    },
+    {
+      "id": 2,
+      "openId": "user_murilo",
+      "name": "Murilo Silva",
+      "email": "olirumdev1@gmail.com",
+      "loginMethod": "local-password",
+      "passwordHash": "95baf1482029d051ad76fdd7dfafdef2:eb47f0b260707c3069a1997a069ada00206456af8679b0e650268d0fb17af1ed35bbcaff5b39289ddf3d2ef72f868d2dc5be0e121e3848cda87b83e9f9142c06",
+      "role": "admin",
+      "createdAt": "2026-09-28T13:30:39.767Z",
+      "updatedAt": "2026-09-28T13:30:39.767Z",
+      "lastSignedIn": "2026-09-28T13:30:39.767Z"
+    }
+  ],
+  "professionalProfiles": [
+    {
+      "id": 1,
+      "userId": 1,
+      "displayName": "Meu Perfil Profissional",
+      "slug": "meu-perfil",
+      "professionCategory": "Serviços Gerais",
+      "professionName": "Profissional Autônomo",
+      "bio": "Serviços profissionais com qualidade, transparência e pontualidade.",
+      "city": "São Paulo - SP",
+      "serviceRegion": "São Paulo e Região",
+      "phone": "(11) 99999-9999",
+      "whatsapp": "(11) 99999-9999",
+      "avatarUrl": null,
+      "pixKey": null,
+      "pixKeyType": null,
+      "showPrices": true,
+      "bookingEnabled": true,
+      "createdAt": "2026-09-28T13:30:39.767Z",
+      "updatedAt": "2026-09-28T13:30:39.767Z"
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "displayName": "Murilo Silva",
+      "slug": "murilo-silva",
+      "professionCategory": "Estética & Beleza",
+      "professionName": "Estúdio & Beleza",
+      "bio": "Atendimento profissional com hora marcada, qualidade e atenção aos detalhes.",
+      "city": "São Paulo - SP",
+      "serviceRegion": "São Paulo e Região",
+      "phone": "(11) 99999-9999",
+      "whatsapp": "(11) 99999-9999",
+      "avatarUrl": null,
+      "pixKey": null,
+      "pixKeyType": null,
+      "showPrices": true,
+      "bookingEnabled": true,
+      "createdAt": "2026-09-28T13:30:39.767Z",
+      "updatedAt": "2026-09-28T13:30:39.767Z"
+    }
+  ],
+  "availability": [
+    {
+      "id": 1,
+      "profileId": 1,
+      "schedule": "{\"days\":[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\",\"sat\"],\"start\":\"08:00\",\"end\":\"18:00\",\"breaks\":[{\"start\":\"12:00\",\"end\":\"13:00\"}]}",
+      "timezone": "America/Sao_Paulo",
+      "unavailableDays": null,
+      "createdAt": "2026-09-28T13:30:39.767Z",
+      "updatedAt": "2026-09-28T13:30:39.767Z"
+    }
+  ],
+  "services": [],
+  "clients": [],
+  "appointments": [],
+  "requests": [],
+  "requestAttachments": [],
+  "quotes": [],
+  "quoteItems": [],
+  "payments": [],
+  "expenses": [],
+  "notifications": [],
+  "teamMembers": []
+}
