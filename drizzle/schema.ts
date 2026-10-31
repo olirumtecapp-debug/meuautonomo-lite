@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   varchar,
+  decimal,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -180,7 +181,8 @@ export const quoteItems = mysqlTable("quoteItems", {
   id: int("id").autoincrement().primaryKey(),
   quoteId: int("quoteId").notNull(),
   description: varchar("description", { length: 180 }).notNull(),
-  quantity: int("quantity").default(1).notNull(),
+  // Quantidade aceita frações (ex.: 2,5 horas, 1,25 kg), com duas casas decimais.
+  quantity: decimal("quantity", { precision: 10, scale: 2, mode: "number" }).default(1).notNull(),
   unitPriceCents: int("unitPriceCents").default(0).notNull(),
   totalCents: int("totalCents").default(0).notNull(),
 });
