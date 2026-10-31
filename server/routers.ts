@@ -1665,8 +1665,9 @@ export const appRouter = router({
       const payConditions = [eq(payments.profileId, profile.id)];
       if (input?.from) payConditions.push(gte(payments.createdAt, new Date(input.from)));
       if (input?.to) payConditions.push(lt(payments.createdAt, new Date(input.to)));
-      if (input?.teamMemberId) payConditions.push(eq(payments.teamMemberId, input.teamMemberId));
-
+      // Não filtrar pagamentos pelo teamMemberId antes de tentar associá-los:
+      // lançamentos antigos feitos pelo Financeiro podem não ter esse campo preenchido,
+      // embora pertençam a um atendimento de um parceiro.
       const periodPayments = await db.select().from(payments).where(and(...payConditions)).orderBy(desc(payments.createdAt));
 
       const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
@@ -1683,11 +1684,22 @@ export const appRouter = router({
       const targetMembers = input?.teamMemberId
         ? members.filter(m => m.id === input.teamMemberId)
         : members;
+      const reportPayments = input?.teamMemberId
+        ? periodPayments.filter(payment =>
+            payment.teamMemberId === input.teamMemberId ||
+            periodAppointments.some(app =>
+              app.id === payment.appointmentId ||
+              (payment.clientId != null &&
+                app.clientId === payment.clientId &&
+                (!payment.serviceId || app.serviceId === payment.serviceId))
+            )
+          )
+        : periodPayments;
 
       return calculateTeamReport(
         targetMembers,
         periodAppointments as any,
-        periodPayments as any,
+        reportPayments as any,
         periodExpenses as any
       );
     }),
@@ -1826,17 +1838,36 @@ export const appRouter = router({
       const seriesMap = new Map<string, { date: string; receitas: number; pendentes: number; despesas: number }>();
       const ensureDay = (date: Date) => { const key = date.toISOString().slice(0, 10); if (!seriesMap.has(key)) seriesMap.set(key, { date: key, receitas: 0, pendentes: 0, despesas: 0 }); return seriesMap.get(key)!; };
 
-      const linkedAppIds = new Set(monthPayments.map(p => p.appointmentId).filter(Boolean));
+      const { paymentsByAppointmentId } = associatePaymentsToAppointments(
+        monthAppointments as any,
+        monthPayments as any
+      );
+
+      // Lançamentos financeiros aparecem na data em que foram registrados.
+      // A associação compartilhada impede que pagamento + atendimento sejam somados duas vezes.
       for (const payment of monthPayments) {
         const day = ensureDay(new Date(payment.createdAt));
         if (payment.status === "pago") day.receitas += payment.amountCents;
         else day.pendentes += payment.amountCents;
       }
+
       for (const app of monthAppointments) {
-        if (!linkedAppIds.has(app.id) && isBillableAppointment(app.status) && app.amountCents > 0) {
+        if (!isBillableAppointment(app.status) || app.amountCents <= 0) continue;
+        const linkedPayments = paymentsByAppointmentId.get(app.id) || [];
+        const recordedAmount = linkedPayments.reduce((sum, payment) => sum + payment.amountCents, 0);
+        const remainingCents = linkedPayments.length > 0
+          ? Math.max(0, app.amountCents - recordedAmount)
+          : app.amountCents;
+
+        if (remainingCents > 0) {
           const day = ensureDay(new Date(app.startsAt));
-          if (app.paymentStatus === "pago" || app.status === "concluido") day.receitas += app.amountCents;
-          else day.pendentes += app.amountCents;
+          // Se já existem pagamentos lançados, o saldo não coberto permanece pendente.
+          const legacyPaid =
+            linkedPayments.length === 0 &&
+            (app.paymentStatus === "pago" ||
+              (app.paymentStatus == null && app.status === "concluido"));
+          if (legacyPaid) day.receitas += remainingCents;
+          else day.pendentes += remainingCents;
         }
       }
       for (const expense of monthExpenses) {
