@@ -32,6 +32,7 @@ import { getAdminEmail, getAdminPassword, getAdminUsername, isDemoMode, setDemoM
 import crypto from "node:crypto";
 import { generateReceiptAuthCode } from "./receiptAuth";
 import {
+  associatePaymentsToAppointments,
   calculateCommissionAndStudio,
   calculateDeduplicatedMetrics,
   calculateTeamReport,
@@ -617,6 +618,39 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Evita duplicação acidental do mesmo contato mesmo quando o telefone
+      // foi digitado com espaços, parênteses, hífen ou código do país.
+      const digits = (value?: string | null) => (value || "").replace(/\\D/g, "");
+      const normalizeName = (value: string) => value
+        .normalize("NFD")
+        .replace(/[\\u0300-\\u036f]/g, "")
+        .trim()
+        .replace(/\\s+/g, " ")
+        .toLocaleLowerCase("pt-BR");
+      const incomingPhone = digits(input.phone || input.whatsapp);
+      if (incomingPhone) {
+        const existingClients = await db.select({
+          id: clients.id,
+          name: clients.name,
+          phone: clients.phone,
+          whatsapp: clients.whatsapp,
+        }).from(clients).where(and(
+          eq(clients.profileId, profile.id),
+          eq(clients.archived, false)
+        ));
+        const duplicate = existingClients.find(client =>
+          digits(client.phone || client.whatsapp) === incomingPhone &&
+          normalizeName(client.name) === normalizeName(input.name)
+        );
+        if (duplicate) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Este cliente já está cadastrado com esse telefone. Confira a lista de clientes antes de criar outro registro.",
+          });
+        }
+      }
+
       await db.insert(clients).values({ ...input, profileId: profile.id, archived: false, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
       return { success: true };
     }),
@@ -1355,19 +1389,39 @@ export const appRouter = router({
       const clientMap = new Map(profileClients.map(c => [c.id, c.name]));
       const serviceMap = new Map(profileServices.map(s => [s.id, s.name]));
 
-      const explicitlyLinkedAppIds = new Set(rawPayments.map(p => p.appointmentId).filter(Boolean));
+      const { paymentsByAppointmentId } = associatePaymentsToAppointments(
+        periodAppointments as any,
+        rawPayments as any
+      );
+      const appointmentIdByPaymentId = new Map<number, number>();
+      for (const [appointmentId, linkedPayments] of paymentsByAppointmentId) {
+        for (const payment of linkedPayments) appointmentIdByPaymentId.set(payment.id, appointmentId);
+      }
+
       const rows: any[] = rawPayments.map(r => ({
         ...r,
+        // Expõe o vínculo inferido também na listagem, sem alterar o registro no banco.
+        appointmentId: r.appointmentId ?? appointmentIdByPaymentId.get(r.id) ?? null,
         clientName: r.clientId ? clientMap.get(r.clientId) || null : null,
         serviceName: r.serviceId ? serviceMap.get(r.serviceId) || null : null,
       }));
 
       for (const app of periodAppointments) {
         if (!isBillableAppointment(app.status)) continue;
-        if (explicitlyLinkedAppIds.has(app.id)) continue;
 
-        const hasUnlinkedMatch = rawPayments.some(p => !p.appointmentId && p.clientId === app.clientId && p.amountCents === app.amountCents);
-        if (hasUnlinkedMatch) continue;
+        const linkedPayments = paymentsByAppointmentId.get(app.id) || [];
+        const recordedAmount = linkedPayments.reduce((sum, payment) => sum + payment.amountCents, 0);
+        const remainingCents = linkedPayments.length > 0
+          ? Math.max(0, app.amountCents - recordedAmount)
+          : app.amountCents;
+        if (remainingCents <= 0) continue;
+
+        const hasLegacyPaidState =
+          app.paymentStatus === "pago" ||
+          (app.paymentStatus == null && app.status === "concluido");
+        // Quando já há lançamentos financeiros, eles são a fonte de verdade:
+        // o saldo ainda não coberto permanece pendente.
+        const status = linkedPayments.length > 0 ? "pendente" : hasLegacyPaidState ? "pago" : "pendente";
 
         rows.push({
           id: -app.id,
@@ -1376,15 +1430,17 @@ export const appRouter = router({
           appointmentId: app.id,
           clientId: app.clientId,
           serviceId: app.serviceId,
-          amountCents: app.amountCents,
+          amountCents: remainingCents,
           commissionPercent: null,
           commissionAmountCents: 0,
-          studioAmountCents: app.amountCents,
+          studioAmountCents: remainingCents,
           commissionPaid: false,
           method: (app.paymentMethod as any) || "pix",
-          status: (app.paymentStatus === "pago" || app.status === "concluido") ? "pago" : "pendente",
-          note: app.notes || null,
-          paidAt: app.paymentStatus === "pago" ? app.startsAt : null,
+          status,
+          note: linkedPayments.length > 0
+            ? `Saldo pendente do atendimento #${app.id}`
+            : app.notes || null,
+          paidAt: status === "pago" ? app.startsAt : null,
           createdAt: app.startsAt,
           clientName: app.clientId ? clientMap.get(app.clientId) || null : null,
           serviceName: app.serviceId ? serviceMap.get(app.serviceId) || null : null,
@@ -1408,20 +1464,6 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // Debounce contra duplo clique / submissão duplicada (BUG-001)
-      const twoSecondsAgo = new Date(Date.now() - 2500);
-      const recentDup = await db.select({ id: payments.id }).from(payments).where(and(
-        eq(payments.profileId, profile.id),
-        eq(payments.amountCents, input.amountCents),
-        eq(payments.method, input.method),
-        eq(payments.status, input.status),
-        gte(payments.createdAt, twoSecondsAgo)
-      )).limit(1);
-
-      if (recentDup.length > 0) {
-        return { success: true };
-      }
 
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
@@ -1665,19 +1707,6 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // Debounce contra duplo clique / submissão duplicada (BUG-002)
-      const twoSecondsAgo = new Date(Date.now() - 2500);
-      const recentDup = await db.select({ id: expenses.id }).from(expenses).where(and(
-        eq(expenses.profileId, profile.id),
-        eq(expenses.description, input.description),
-        eq(expenses.amountCents, input.amountCents),
-        gte(expenses.createdAt, twoSecondsAgo)
-      )).limit(1);
-
-      if (recentDup.length > 0) {
-        return { success: true };
-      }
 
       await db.insert(expenses).values({ profileId: profile.id, description: input.description, category: input.category ?? null, amountCents: input.amountCents, occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(), note: input.note ?? null });
       return { success: true };
