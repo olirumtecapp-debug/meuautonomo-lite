@@ -1476,11 +1476,12 @@ export const appRouter = router({
       // Se appointmentId foi fornecido explicitamente, herdar dados ausentes do agendamento
       if (resolvedAppointmentId) {
         const appRow = (await db.select().from(appointments).where(and(eq(appointments.id, resolvedAppointmentId), eq(appointments.profileId, profile.id))).limit(1))[0];
-        if (appRow) {
-          if (!resolvedClientId && appRow.clientId) resolvedClientId = appRow.clientId;
-          if (!resolvedServiceId && appRow.serviceId) resolvedServiceId = appRow.serviceId;
-          if (!resolvedTeamMemberId && appRow.teamMemberId) resolvedTeamMemberId = appRow.teamMemberId;
+        if (!appRow) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Atendimento não encontrado para este lançamento." });
         }
+        if (!resolvedClientId && appRow.clientId) resolvedClientId = appRow.clientId;
+        if (!resolvedServiceId && appRow.serviceId) resolvedServiceId = appRow.serviceId;
+        if (!resolvedTeamMemberId && appRow.teamMemberId) resolvedTeamMemberId = appRow.teamMemberId;
       } else if (resolvedClientId) {
         // Se appointmentId NÃO foi fornecido, mas temos clientId:
         // Procurar agendamento compatível não cancelado e ainda não totalmente pago
@@ -1532,8 +1533,30 @@ export const appRouter = router({
       });
 
       if (resolvedAppointmentId) {
+        const [appointmentRow] = await db.select({
+          amountCents: appointments.amountCents,
+        }).from(appointments).where(and(
+          eq(appointments.id, resolvedAppointmentId),
+          eq(appointments.profileId, profile.id)
+        )).limit(1);
+        const linkedPayments = await db.select({
+          amountCents: payments.amountCents,
+          status: payments.status,
+        }).from(payments).where(and(
+          eq(payments.profileId, profile.id),
+          eq(payments.appointmentId, resolvedAppointmentId)
+        ));
+        const paidCents = linkedPayments
+          .filter(payment => payment.status === "pago")
+          .reduce((sum, payment) => sum + payment.amountCents, 0);
+        const nextPaymentStatus = paidCents >= (appointmentRow?.amountCents || 0)
+          ? "pago"
+          : paidCents > 0
+            ? "parcial"
+            : "pendente";
+
         await db.update(appointments).set({
-          paymentStatus: input.status,
+          paymentStatus: nextPaymentStatus,
           paymentMethod: input.method,
           teamMemberId: resolvedTeamMemberId ?? undefined
         }).where(and(eq(appointments.id, resolvedAppointmentId), eq(appointments.profileId, profile.id)));
