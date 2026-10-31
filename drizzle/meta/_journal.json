@@ -29,6 +29,13 @@
       "when": 1789995799638,
       "tag": "0003_greedy_randall_flagg",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1793490488167,
+      "tag": "0004_quote_quantity_decimal",
+      "breakpoints": true
     }
   ]
 }
