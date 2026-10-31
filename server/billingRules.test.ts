@@ -269,7 +269,6 @@ describe("Domain Billing Rules - Unit & Mathematical Tests", () => {
       expect(teamReport.totalGrossCents).toBe(0);
       expect(teamReport.totalCommissionCents).toBe(0);
     });
-  });
   it("includes studio-owned manual revenue in the team total without charging partner commission", () => {
     const directSale: PaymentRecord = {
       id: 900,
@@ -366,4 +365,5 @@ describe("Domain Billing Rules - Unit & Mathematical Tests", () => {
     expect(report.payments[0].status).toBe("pendente");
   });
 
+  });
 });
