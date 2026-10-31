@@ -621,12 +621,12 @@ export const appRouter = router({
 
       // Evita duplicação acidental do mesmo contato mesmo quando o telefone
       // foi digitado com espaços, parênteses, hífen ou código do país.
-      const digits = (value?: string | null) => (value || "").replace(/\\D/g, "");
+      const digits = (value?: string | null) => (value || "").replace(/\D/g, "");
       const normalizeName = (value: string) => value
         .normalize("NFD")
-        .replace(/[\\u0300-\\u036f]/g, "")
+        .replace(/[\u0300-\u036f]/g, "")
         .trim()
-        .replace(/\\s+/g, " ")
+        .replace(/\s+/g, " ")
         .toLocaleLowerCase("pt-BR");
       const incomingPhone = digits(input.phone || input.whatsapp);
       if (incomingPhone) {
