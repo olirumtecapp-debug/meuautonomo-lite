@@ -1394,9 +1394,9 @@ export const appRouter = router({
         rawPayments as any
       );
       const appointmentIdByPaymentId = new Map<number, number>();
-      for (const [appointmentId, linkedPayments] of paymentsByAppointmentId) {
-        for (const payment of linkedPayments) appointmentIdByPaymentId.set(payment.id, appointmentId);
-      }
+      paymentsByAppointmentId.forEach((linkedPayments, appointmentId) => {
+        linkedPayments.forEach(payment => appointmentIdByPaymentId.set(payment.id, appointmentId));
+      });
 
       const rows: any[] = rawPayments.map(r => ({
         ...r,
