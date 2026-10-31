@@ -1148,7 +1148,7 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-    create: protectedProcedure.input(z.object({ clientId: z.number().optional(), requestId: z.number().optional(), serviceId: z.number().optional(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(false), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ clientId: z.number().optional(), requestId: z.number().optional(), serviceId: z.number().optional(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(false), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000).multipleOf(0.01), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
@@ -1164,7 +1164,7 @@ export const appRouter = router({
       if (input.sendNow) await createNotification(profile.id, "Orçamento enviado", "Seu orçamento está disponível por um link público.", "quote");
       return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
-    update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000).multipleOf(0.01), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
