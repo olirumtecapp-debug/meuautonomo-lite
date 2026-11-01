@@ -130,7 +130,9 @@ export async function getDb(): Promise<ReturnType<typeof drizzle>> {
       let lastErr: any = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          _db = drizzle(process.env.DATABASE_URL);
+          const testDb = drizzle(process.env.DATABASE_URL);
+          await testDb.execute(sql`SELECT 1`);
+          _db = testDb;
           ensureSchema(_db).catch((err) => console.warn("[Database] ensureSchema error:", err?.message || err));
           lastErr = null;
           break;
