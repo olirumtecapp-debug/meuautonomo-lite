@@ -63,6 +63,8 @@ export interface PaymentRecord {
   serviceId?: number | null;
   teamMemberId?: number | null;
   amountCents: number;
+  /** Valor efetivamente recebido quando o item representa um atendimento consolidado. */
+  receivedAmountCents?: number;
   status: "pago" | "pendente" | "parcial" | string;
   method?: string | null;
   commissionPercent?: number | null;
@@ -114,8 +116,64 @@ export interface TeamFinancialReport {
   totalStudioNetCents: number;
   totalExpensesCents: number;
   finalProfitCents: number;
+  unassignedGrossCents: number;
+  unassignedReceivedCents: number;
   breakdown: TeamMemberBreakdown[];
   payments: PaymentRecord[];
+}
+
+/**
+ * Associa pagamentos aos atendimentos. Prioriza appointmentId explícito; na
+ * ausência dele, usa cliente/serviço e mantém pagamentos parciais ligados ao
+ * mesmo atendimento até cobrir o valor faturável.
+ */
+export function associatePaymentsToAppointments(
+  appointments: AppointmentRecord[],
+  payments: PaymentRecord[]
+): {
+  paymentsByAppointmentId: Map<number, PaymentRecord[]>;
+  unlinkedPayments: PaymentRecord[];
+} {
+  const billableApps = appointments.filter(a => isBillableAppointment(a.status));
+  const paymentsByAppointmentId = new Map<number, PaymentRecord[]>();
+  const unlinkedPayments: PaymentRecord[] = [];
+  const explicitlyLinkedPaymentIds = new Set<number>();
+
+  for (const pay of payments) {
+    if (!pay.appointmentId) continue;
+    if (!paymentsByAppointmentId.has(pay.appointmentId)) {
+      paymentsByAppointmentId.set(pay.appointmentId, []);
+    }
+    paymentsByAppointmentId.get(pay.appointmentId)!.push(pay);
+    explicitlyLinkedPaymentIds.add(pay.id);
+  }
+
+  for (const pay of payments) {
+    if (explicitlyLinkedPaymentIds.has(pay.id)) continue;
+
+    let matchedApp: AppointmentRecord | undefined;
+    if (pay.clientId) {
+      matchedApp = billableApps.find(app => {
+        if (app.clientId !== pay.clientId) return false;
+        if (pay.serviceId && app.serviceId !== pay.serviceId) return false;
+        const linked = paymentsByAppointmentId.get(app.id) || [];
+        const amountAlreadyAssociated = linked
+          .reduce((sum, item) => sum + (item.amountCents || 0), 0);
+        return amountAlreadyAssociated < (app.amountCents || 0);
+      });
+    }
+
+    if (matchedApp) {
+      if (!paymentsByAppointmentId.has(matchedApp.id)) {
+        paymentsByAppointmentId.set(matchedApp.id, []);
+      }
+      paymentsByAppointmentId.get(matchedApp.id)!.push(pay);
+    } else {
+      unlinkedPayments.push(pay);
+    }
+  }
+
+  return { paymentsByAppointmentId, unlinkedPayments };
 }
 
 /**
@@ -136,44 +194,8 @@ export function calculateDeduplicatedMetrics(
   const billableApps = appointments.filter(a => isBillableAppointment(a.status));
   const appointmentCount = appointments.filter(a => isCountableAppointment(a.status)).length;
 
-  // Mapear pagamentos vinculados a cada agendamento
-  const paymentsByAppId = new Map<number, PaymentRecord[]>();
-  const unlinkedPayments: PaymentRecord[] = [];
-
-  // Primeiro passo: agrupar por appointmentId explícito
-  const explicitlyLinkedPaymentIds = new Set<number>();
-  for (const pay of payments) {
-    if (pay.appointmentId) {
-      if (!paymentsByAppId.has(pay.appointmentId)) {
-        paymentsByAppId.set(pay.appointmentId, []);
-      }
-      paymentsByAppId.get(pay.appointmentId)!.push(pay);
-      explicitlyLinkedPaymentIds.add(pay.id);
-    }
-  }
-
-  // Segundo passo: para pagamentos sem appointmentId explícito, associar por clientId/serviceId
-  for (const pay of payments) {
-    if (explicitlyLinkedPaymentIds.has(pay.id)) continue;
-
-    let matchedApp: AppointmentRecord | undefined;
-    if (pay.clientId) {
-      matchedApp = billableApps.find(a => 
-        a.clientId === pay.clientId && 
-        (!paymentsByAppId.has(a.id) || paymentsByAppId.get(a.id)!.length === 0) &&
-        (pay.serviceId ? a.serviceId === pay.serviceId : true)
-      );
-    }
-
-    if (matchedApp) {
-      if (!paymentsByAppId.has(matchedApp.id)) {
-        paymentsByAppId.set(matchedApp.id, []);
-      }
-      paymentsByAppId.get(matchedApp.id)!.push(pay);
-    } else {
-      unlinkedPayments.push(pay);
-    }
-  }
+  const { paymentsByAppointmentId: paymentsByAppId, unlinkedPayments } =
+    associatePaymentsToAppointments(appointments, payments);
 
   let faturamentoCents = 0;
   let recebidoCents = 0;
@@ -192,7 +214,10 @@ export function calculateDeduplicatedMetrics(
       pendenteCents += Math.max(0, appGross - appReceived);
     } else {
       // Sem pagamentos registrados na tabela de pagamentos
-      if (app.paymentStatus === "pago" || app.status === "concluido") {
+      if (
+        app.paymentStatus === "pago" ||
+        (app.paymentStatus == null && app.status === "concluido")
+      ) {
         recebidoCents += appGross;
       } else {
         pendenteCents += appGross;
@@ -234,60 +259,40 @@ export function calculateTeamReport(
 ): TeamFinancialReport {
   const billableApps = appointments.filter(a => isCommissionEligible(a.status));
 
-  // Mapear pagamentos vinculados
-  const paymentsByAppId = new Map<number, PaymentRecord[]>();
-  const unlinkedPayments: PaymentRecord[] = [];
-
-  const explicitlyLinkedPaymentIds = new Set<number>();
-  for (const pay of payments) {
-    if (pay.appointmentId) {
-      if (!paymentsByAppId.has(pay.appointmentId)) {
-        paymentsByAppId.set(pay.appointmentId, []);
-      }
-      paymentsByAppId.get(pay.appointmentId)!.push(pay);
-      explicitlyLinkedPaymentIds.add(pay.id);
-    }
-  }
-
-  for (const pay of payments) {
-    if (explicitlyLinkedPaymentIds.has(pay.id)) continue;
-
-    let matchedApp: AppointmentRecord | undefined;
-    if (pay.clientId) {
-      matchedApp = billableApps.find(a => 
-        a.clientId === pay.clientId && 
-        (!paymentsByAppId.has(a.id) || paymentsByAppId.get(a.id)!.length === 0) &&
-        (pay.serviceId ? a.serviceId === pay.serviceId : true)
-      );
-    }
-
-    if (matchedApp) {
-      if (!paymentsByAppId.has(matchedApp.id)) {
-        paymentsByAppId.set(matchedApp.id, []);
-      }
-      paymentsByAppId.get(matchedApp.id)!.push(pay);
-    } else {
-      unlinkedPayments.push(pay);
-    }
-  }
+  const { paymentsByAppointmentId: paymentsByAppId, unlinkedPayments } =
+    associatePaymentsToAppointments(appointments, payments);
 
   // Lista consolidada de lançamentos financeiros deduplicados
   const consolidatedPayments: PaymentRecord[] = [];
 
   for (const app of billableApps) {
     const linkedPays = paymentsByAppId.get(app.id) || [];
-    const effectiveTeamMemberId = app.teamMemberId || linkedPays.find(p => p.teamMemberId)?.teamMemberId || null;
-    const member = members.find(m => m.id === effectiveTeamMemberId);
-    const commPct = member?.commissionPercent ?? 50;
+    const requestedTeamMemberId = app.teamMemberId || linkedPays.find(p => p.teamMemberId)?.teamMemberId || null;
+    const member = members.find(m => m.id === requestedTeamMemberId);
+    // Atendimento próprio do estúdio, sem parceiro válido, não gera comissão.
+    const effectiveTeamMemberId = member?.id ?? null;
+    const commPct = member?.commissionPercent ?? 0;
     const commAmount = Math.round(((app.amountCents || 0) * commPct) / 100);
     const studioAmount = (app.amountCents || 0) - commAmount;
 
-    let isPaid = app.paymentStatus === "pago" || app.status === "concluido";
-    let paidSum = 0;
+    let receivedAmountCents = 0;
     if (linkedPays.length > 0) {
-      paidSum = linkedPays.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      isPaid = isPaid || paidSum >= app.amountCents;
+      receivedAmountCents = Math.min(
+        app.amountCents || 0,
+        linkedPays.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0)
+      );
+    } else if (
+      app.paymentStatus === "pago" ||
+      (app.paymentStatus == null && app.status === "concluido")
+    ) {
+      receivedAmountCents = app.amountCents || 0;
     }
+
+    const itemStatus = receivedAmountCents >= (app.amountCents || 0)
+      ? "pago"
+      : receivedAmountCents > 0
+        ? "parcial"
+        : "pendente";
 
     consolidatedPayments.push({
       id: linkedPays[0]?.id || -app.id,
@@ -297,10 +302,11 @@ export function calculateTeamReport(
       serviceId: app.serviceId,
       teamMemberId: effectiveTeamMemberId,
       amountCents: app.amountCents,
+      receivedAmountCents,
       commissionPercent: commPct,
       commissionAmountCents: commAmount,
       studioAmountCents: studioAmount,
-      status: isPaid ? "pago" : "pendente",
+      status: itemStatus,
       method: linkedPays[0]?.method || app.paymentMethod || "pix",
       createdAt: linkedPays[0]?.createdAt || app.startsAt,
     });
@@ -315,7 +321,10 @@ export function calculateTeamReport(
   const breakdown: TeamMemberBreakdown[] = members.map(m => {
     const memberItems = consolidatedPayments.filter(p => p.teamMemberId === m.id);
     const grossCents = memberItems.reduce((sum, p) => sum + (p.amountCents || 0), 0);
-    const receivedCents = memberItems.filter(p => p.status === "pago").reduce((sum, p) => sum + (p.amountCents || 0), 0);
+    const receivedCents = memberItems.reduce(
+      (sum, p) => sum + (p.receivedAmountCents ?? (p.status === "pago" ? p.amountCents || 0 : 0)),
+      0
+    );
 
     // A comissão é calculada sobre o faturamento do parceiro
     const commissionCents = memberItems.reduce((sum, p) => {
@@ -339,9 +348,19 @@ export function calculateTeamReport(
     };
   });
 
-  const totalGrossCents = breakdown.reduce((sum, b) => sum + b.grossCents, 0);
-  const totalReceivedCents = breakdown.reduce((sum, b) => sum + b.receivedCents, 0);
+  // Totais gerais incluem também os lançamentos próprios, sem parceiro.
+  const totalGrossCents = consolidatedPayments.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+  const totalReceivedCents = consolidatedPayments.reduce(
+    (sum, p) => sum + (p.receivedAmountCents ?? (p.status === "pago" ? p.amountCents || 0 : 0)),
+    0
+  );
   const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
+  const unassignedPayments = consolidatedPayments.filter(p => !p.teamMemberId);
+  const unassignedGrossCents = unassignedPayments.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+  const unassignedReceivedCents = unassignedPayments.reduce(
+    (sum, p) => sum + (p.receivedAmountCents ?? (p.status === "pago" ? p.amountCents || 0 : 0)),
+    0
+  );
   const totalStudioNetCents = totalGrossCents - totalCommissionCents;
   const totalExpensesCents = expenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
   const finalProfitCents = totalStudioNetCents - totalExpensesCents;
@@ -353,6 +372,8 @@ export function calculateTeamReport(
     totalStudioNetCents,
     totalExpensesCents,
     finalProfitCents,
+    unassignedGrossCents,
+    unassignedReceivedCents,
     breakdown,
     payments: consolidatedPayments,
   };

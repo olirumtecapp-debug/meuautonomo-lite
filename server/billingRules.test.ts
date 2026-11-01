@@ -269,5 +269,101 @@ describe("Domain Billing Rules - Unit & Mathematical Tests", () => {
       expect(teamReport.totalGrossCents).toBe(0);
       expect(teamReport.totalCommissionCents).toBe(0);
     });
+  it("includes studio-owned manual revenue in the team total without charging partner commission", () => {
+    const directSale: PaymentRecord = {
+      id: 900,
+      profileId: 1,
+      clientId: 999,
+      amountCents: 5000,
+      status: "pago",
+      method: "pix",
+      createdAt: "2026-09-30T12:00:00.000Z",
+    };
+    const app: AppointmentRecord = {
+      id: 901,
+      profileId: 1,
+      clientId: 30001,
+      serviceId: 201,
+      teamMemberId: 5,
+      startsAt: "2026-09-30T10:00:00.000Z",
+      durationMinutes: 60,
+      amountCents: 18000,
+      status: "confirmado",
+      paymentStatus: "pago",
+    };
+
+    const report = calculateTeamReport(
+      [camilaMember],
+      [app],
+      [directSale],
+      [{ amountCents: 4000 }]
+    );
+
+    expect(report.totalGrossCents).toBe(23000);
+    expect(report.totalReceivedCents).toBe(23000);
+    expect(report.totalCommissionCents).toBe(8100);
+    expect(report.totalStudioNetCents).toBe(14900);
+    expect(report.totalExpensesCents).toBe(4000);
+    expect(report.finalProfitCents).toBe(10900);
+    expect(report.unassignedGrossCents).toBe(5000);
+    expect(report.unassignedReceivedCents).toBe(5000);
+  });
+
+  it("counts partial receipts in the team report instead of marking the whole appointment paid or unpaid", () => {
+    const app: AppointmentRecord = {
+      id: 902,
+      profileId: 1,
+      clientId: 30001,
+      serviceId: 201,
+      teamMemberId: 5,
+      startsAt: "2026-09-30T10:00:00.000Z",
+      durationMinutes: 60,
+      amountCents: 18000,
+      status: "confirmado",
+      paymentStatus: "parcial",
+    };
+    const partialPayment: PaymentRecord = {
+      id: 903,
+      profileId: 1,
+      clientId: 30001,
+      serviceId: 201,
+      amountCents: 10000,
+      status: "pago",
+      method: "pix",
+      createdAt: "2026-09-30T10:30:00.000Z",
+    };
+
+    const report = calculateTeamReport([camilaMember], [app], [partialPayment]);
+
+    expect(report.totalGrossCents).toBe(18000);
+    expect(report.totalReceivedCents).toBe(10000);
+    expect(report.breakdown[0].receivedCents).toBe(10000);
+    expect(report.payments[0].status).toBe("parcial");
+    expect(report.payments[0].receivedAmountCents).toBe(10000);
+  });
+
+  it("does not infer payment from a completed appointment when paymentStatus explicitly says pending", () => {
+    const app: AppointmentRecord = {
+      id: 904,
+      profileId: 1,
+      clientId: 30001,
+      serviceId: 201,
+      teamMemberId: 5,
+      startsAt: "2026-09-30T10:00:00.000Z",
+      durationMinutes: 60,
+      amountCents: 18000,
+      status: "concluido",
+      paymentStatus: "pendente",
+    };
+
+    const metrics = calculateDeduplicatedMetrics([app], []);
+    const report = calculateTeamReport([camilaMember], [app], []);
+
+    expect(metrics.recebidoCents).toBe(0);
+    expect(metrics.pendenteCents).toBe(18000);
+    expect(report.totalReceivedCents).toBe(0);
+    expect(report.payments[0].status).toBe("pendente");
+  });
+
   });
 });

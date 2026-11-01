@@ -2640,7 +2640,9 @@ function Requests() {
                     />
                     <Input
                       type="number"
-                      min="1"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
                       value={item.quantity}
                       onChange={e => setQuoteForm({
                         ...quoteForm,

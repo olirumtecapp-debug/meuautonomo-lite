@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
@@ -43,13 +43,19 @@ function createMockContext(user: TrpcContext["user"] = null): {
 
 describe("Painel Administrativo & Gestão de Vouchers - MeuAutônomo", () => {
   const adminEmail = getAdminEmail();
-  const adminPassword = DEFAULT_ADMIN_PASSWORD;
+  let adminPassword = DEFAULT_ADMIN_PASSWORD;
   let adminSessionToken: string;
   let adminUser: NonNullable<TrpcContext["user"]>;
   let savedQaUser: NonNullable<TrpcContext["user"]>;
   let initialDbSnapshot: string | null = null;
 
   beforeAll(async () => {
+    // Os testes precisam ser reproduzíveis sem depender de um segredo de produção.
+    if (!process.env.ADMIN_PASSWORD) {
+      vi.stubEnv("ADMIN_PASSWORD", "QA-Only-Admin-Password-2026!");
+    }
+    adminPassword = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+
     const fs = await import("fs");
     if (fs.existsSync("server/data/db-store.json")) {
       initialDbSnapshot = fs.readFileSync("server/data/db-store.json", "utf8");
@@ -352,6 +358,7 @@ describe("Painel Administrativo & Gestão de Vouchers - MeuAutônomo", () => {
   });
 
   afterAll(async () => {
+    vi.unstubAllEnvs();
     const fs = await import("fs");
     if (initialDbSnapshot) {
       fs.writeFileSync("server/data/db-store.json", initialDbSnapshot, "utf8");

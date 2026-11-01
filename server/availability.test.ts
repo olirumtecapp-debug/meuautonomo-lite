@@ -8,17 +8,17 @@ describe("isWithinAvailability", () => {
   };
 
   it("allows a weekday appointment inside the configured window", () => {
-    expect(isWithinAvailability(new Date(2026, 8, 21, 10, 0), 60, row)).toBe(true);
+    expect(isWithinAvailability(new Date("2026-09-21T13:00:00.000Z"), 60, row)).toBe(true);
   });
 
   it("rejects appointments outside working hours or on a break", () => {
-    expect(isWithinAvailability(new Date(2026, 8, 21, 7, 30), 60, row)).toBe(false);
-    expect(isWithinAvailability(new Date(2026, 8, 21, 12, 15), 30, row)).toBe(false);
+    expect(isWithinAvailability(new Date("2026-09-21T10:30:00.000Z"), 60, row)).toBe(false);
+    expect(isWithinAvailability(new Date("2026-09-21T15:15:00.000Z"), 30, row)).toBe(false);
   });
 
   it("rejects non-working weekdays and unavailable dates", () => {
-    expect(isWithinAvailability(new Date(2026, 8, 20, 10, 0), 60, row)).toBe(false);
-    expect(isWithinAvailability(new Date(2026, 8, 23, 10, 0), 60, row)).toBe(false);
+    expect(isWithinAvailability(new Date("2026-09-20T13:00:00.000Z"), 60, row)).toBe(false);
+    expect(isWithinAvailability(new Date("2026-09-23T13:00:00.000Z"), 60, row)).toBe(false);
   });
 
   it("handles UTC ISO timestamps accurately according to America/Sao_Paulo timezone", () => {

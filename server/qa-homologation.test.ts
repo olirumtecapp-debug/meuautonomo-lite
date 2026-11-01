@@ -373,26 +373,32 @@ describe("QA Homologation Scenario - End-to-End Integration Tests", () => {
     expect(req!.status).toBe("proposta_aceita");
   });
 
-  it("7. Onda 2: Permite orçamento com quantidade decimal/fracionária e calcula subtotal corretamente (BUG-024)", async () => {
+  it("7. Onda 2: Permite orçamento com quantidade 1,5, persiste e calcula o total corretamente (BUG-024)", async () => {
     const caller = appRouter.createCaller(createContext());
     const res = await caller.quote.create({
       clientId: 30001,
       validUntil: "2026-10-15T12:00:00.000Z",
       items: [
         {
-          description: "Cabo flexível por metro",
-          quantity: 2.5,
-          unitPriceCents: 1000, // R$ 10,00 por metro
+          description: "Serviço por hora",
+          quantity: 1.5,
+          unitPriceCents: 8000, // R$ 80,00 por hora
         },
       ],
-      discountCents: 500, // R$ 5,00 de desconto
+      discountCents: 0,
     });
 
     expect(res.quoteId).toBeDefined();
     const createdQuote = dbData.quotes.find((q) => q.id === res.quoteId);
+    const createdItem = dbData.quoteItems.find((item) => item.quoteId === res.quoteId);
+
     expect(createdQuote).toBeDefined();
-    expect(createdQuote!.subtotalCents).toBe(2500); // 2.5 * 1000 = 2500
-    expect(createdQuote!.totalCents).toBe(2000); // 2500 - 500 = 2000
+    expect(createdItem).toBeDefined();
+    expect(createdItem!.quantity).toBe(1.5);
+    expect(createdItem!.unitPriceCents).toBe(8000);
+    expect(createdItem!.totalCents).toBe(12000);
+    expect(createdQuote!.subtotalCents).toBe(12000);
+    expect(createdQuote!.totalCents).toBe(12000);
   });
 
   it("8. Onda 2: Valida relatórios sem capping e com suporte a períodos dinâmicos (BUG-014, BUG-015)", async () => {

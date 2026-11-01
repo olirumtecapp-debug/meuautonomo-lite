@@ -463,7 +463,7 @@ export function TeamPage() {
         Cadastre os profissionais parceiros que utilizam sua estrutura. O MeuAutônomo cuida da apuração de receitas, divide a comissão combinada e facilita o acerto de contas sem burocracia ou risco trabalhista.
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric
           title="Parceiros Ativos"
           value={String(activeMembersCount)}
@@ -472,11 +472,18 @@ export function TeamPage() {
           accent="lime"
         />
         <Metric
-          title="Faturamento da Equipe"
+          title="Faturamento Total"
           value={money(report.data?.totalGrossCents || 0)}
-          hint={`em atendimentos (${periodLabel})`}
+          hint={`atendimentos e receitas próprias (${periodLabel})`}
           icon={CircleDollarSign}
           accent="green"
+        />
+        <Metric
+          title="Receita Própria"
+          value={money(report.data?.unassignedGrossCents || 0)}
+          hint="lançamentos sem parceiro"
+          icon={Coins}
+          accent="blue"
         />
         <Metric
           title="Comissões a Repassar"
@@ -487,8 +494,8 @@ export function TeamPage() {
         />
         <Metric
           title="Lucro do Estúdio"
-          value={money(report.data?.totalStudioNetCents || 0)}
-          hint="retenção líquida do espaço"
+          value={money(report.data?.finalProfitCents || 0)}
+          hint="retenção após comissões e despesas"
           icon={WalletCards}
           accent="blue"
         />

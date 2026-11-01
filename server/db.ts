@@ -112,6 +112,11 @@ async function syncMeuAutonomoCloudVault(db: any) {
 }
 
 export async function getDb(): Promise<ReturnType<typeof drizzle>> {
+  // Em qualquer deployment hospedado, o banco real é obrigatório.
+  // O MockDb continua disponível apenas para desenvolvimento/testes locais.
+  const isDeployedRuntime =
+    process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+
   if (process.env.DATABASE_URL) {
     if (!_db || _db.__isMock) {
       let lastErr: any = null;
@@ -127,7 +132,13 @@ export async function getDb(): Promise<ReturnType<typeof drizzle>> {
         }
       }
       if (lastErr && (!_db || _db.__isMock)) {
-        console.warn("[Database] Failed to connect to DATABASE_URL after 3 attempts:", lastErr);
+        console.error("[Database] Não foi possível inicializar o banco configurado.");
+        if (isDeployedRuntime) {
+          throw new Error(
+            "Não foi possível inicializar o banco de dados. Verifique a DATABASE_URL e o acesso ao TiDB.",
+          );
+        }
+        // Fallback demonstrativo permitido somente na máquina local.
         _db = getMockDb();
       }
     }
@@ -135,6 +146,13 @@ export async function getDb(): Promise<ReturnType<typeof drizzle>> {
       syncMeuAutonomoCloudVault(_db).catch(() => {});
     }
     return _db;
+  }
+
+  // Sem DATABASE_URL, o modo demonstrativo só pode funcionar localmente.
+  if (isDeployedRuntime) {
+    throw new Error(
+      "DATABASE_URL não configurada. O ambiente hospedado não pode usar o banco temporário de demonstração.",
+    );
   }
 
   // Modo de Teste Local Demonstrativo
