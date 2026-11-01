@@ -48,7 +48,18 @@ export const systemRouter = router({
             migrations = (migs as any) || [];
           }
         } catch (queryErr: any) {
-          dbError = queryErr?.message || String(queryErr);
+          dbError = JSON.stringify({
+            message: queryErr?.message,
+            code: queryErr?.code,
+            errno: queryErr?.errno,
+            sqlState: queryErr?.sqlState,
+            cause: queryErr?.cause ? {
+              message: queryErr.cause?.message,
+              code: queryErr.cause?.code,
+              errno: queryErr.cause?.errno,
+              sqlState: queryErr.cause?.sqlState,
+            } : null,
+          });
         }
       }
 
