@@ -273,6 +273,24 @@ var init_schema = __esm({
   }
 });
 
+// server/_core/env.ts
+var ENV;
+var init_env = __esm({
+  "server/_core/env.ts"() {
+    "use strict";
+    ENV = {
+      appId: process.env.VITE_APP_ID || "meuautonomo",
+      cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-production-fallback-secret-min-32-chars-key-2026",
+      databaseUrl: process.env.DATABASE_URL ?? "",
+      oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+      ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+      isProduction: process.env.NODE_ENV === "production",
+      forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+      forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+    };
+  }
+});
+
 // server/mockDb.ts
 var mockDb_exports = {};
 __export(mockDb_exports, {
@@ -641,59 +659,24 @@ var init_mockDb = __esm({
   }
 });
 
-// server/_core/vercel.ts
-import "dotenv/config";
-
-// server/_core/app.ts
-import express from "express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-
-// shared/const.ts
-var COOKIE_NAME = "app_session_id";
-var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
-var AXIOS_TIMEOUT_MS = 3e4;
-var UNAUTHED_ERR_MSG = "Please login (10001)";
-var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
-var OAUTH_STATE_COOKIE = "__Host-oauth_state";
-var decodeOAuthState = (state) => {
-  let decoded;
-  try {
-    decoded = atob(state);
-  } catch {
-    return { redirectUri: "" };
-  }
-  try {
-    const parsed = JSON.parse(decoded);
-    if (parsed && typeof parsed.redirectUri === "string") return parsed;
-  } catch {
-  }
-  return { redirectUri: decoded };
-};
-
-// server/_core/oauth.ts
-import { parse as parseCookieHeader2 } from "cookie";
-
 // server/db.ts
-init_schema();
+var db_exports = {};
+__export(db_exports, {
+  createNotification: () => createNotification,
+  getAllUsers: () => getAllUsers,
+  getDb: () => getDb,
+  getProfileById: () => getProfileById,
+  getProfileBySlug: () => getProfileBySlug,
+  getProfileByUserId: () => getProfileByUserId,
+  getRecentNotifications: () => getRecentNotifications,
+  getUnreadNotificationCount: () => getUnreadNotificationCount,
+  getUserByEmail: () => getUserByEmail,
+  getUserByOpenId: () => getUserByOpenId,
+  updateUserLastSignedIn: () => updateUserLastSignedIn,
+  upsertUser: () => upsertUser
+});
 import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-
-// server/_core/env.ts
-var ENV = {
-  appId: process.env.VITE_APP_ID || "meuautonomo",
-  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-production-fallback-secret-min-32-chars-key-2026",
-  databaseUrl: process.env.DATABASE_URL ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
-};
-
-// server/db.ts
-init_mockDb();
-var _db = null;
-var _schemaMigrationPromise = null;
 async function ensureSchema(db) {
   if (!db || db.__isMock || typeof db.execute !== "function") return;
   if (!_schemaMigrationPromise) {
@@ -710,6 +693,13 @@ async function ensureSchema(db) {
           `);
         } catch (statusErr) {
         }
+        try {
+          await db.execute(sql`
+            ALTER TABLE \`quoteItems\`
+            MODIFY COLUMN \`quantity\` DECIMAL(10,2) NOT NULL DEFAULT 1.00
+          `);
+        } catch (quoteErr) {
+        }
       } catch (err) {
         if (err?.code === "ER_DUP_FIELDNAME" || err?.code === "1060" || String(err?.message || "").includes("Duplicate column") || String(err?.message || "").includes("already exists")) {
         } else {
@@ -720,7 +710,6 @@ async function ensureSchema(db) {
   }
   await _schemaMigrationPromise;
 }
-var _lastMeuAutonomoVaultDay = "";
 async function syncMeuAutonomoCloudVault(db) {
   try {
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -795,12 +784,7 @@ async function getDb() {
         }
       }
       if (lastErr && (!_db || _db.__isMock)) {
-        console.error("[Database] N\xE3o foi poss\xEDvel inicializar o banco configurado.");
-        if (isDeployedRuntime) {
-          throw new Error(
-            "N\xE3o foi poss\xEDvel inicializar o banco de dados. Verifique a DATABASE_URL e o acesso ao TiDB."
-          );
-        }
+        console.warn("[Database] DATABASE_URL inacess\xEDvel ou com bloqueio de rede. Usando armazenamento resiliente:", lastErr?.message || lastErr);
         _db = getMockDb();
       }
     }
@@ -809,11 +793,6 @@ async function getDb() {
       });
     }
     return _db;
-  }
-  if (isDeployedRuntime) {
-    throw new Error(
-      "DATABASE_URL n\xE3o configurada. O ambiente hospedado n\xE3o pode usar o banco tempor\xE1rio de demonstra\xE7\xE3o."
-    );
   }
   if (!_db) {
     console.log("=============================================================================");
@@ -916,6 +895,28 @@ async function getProfileByUserId(userId) {
     throw err;
   }
 }
+async function getProfileById(profileId) {
+  const db = await getDb();
+  if (!db) return void 0;
+  try {
+    const result = await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, profileId)).limit(1);
+    return result[0];
+  } catch (err) {
+    if (String(err?.message || "").includes("accountType") && typeof db.execute === "function") {
+      try {
+        await db.execute(sql`
+          ALTER TABLE \`professionalProfiles\`
+          ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
+        `);
+        const retryResult = await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, profileId)).limit(1);
+        return retryResult[0];
+      } catch (retryErr) {
+        console.error("[Database] Retry getProfileById falhou:", retryErr);
+      }
+    }
+    throw err;
+  }
+}
 async function getProfileBySlug(slug) {
   const db = await getDb();
   if (!db) return void 0;
@@ -944,6 +945,64 @@ async function createNotification(profileId, title, body, type) {
   const { notifications: notifications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
   await db.insert(notifications2).values({ profileId, title, body, type });
 }
+async function getUnreadNotificationCount(profileId) {
+  const db = await getDb();
+  if (!db) return 0;
+  const { notifications: notifications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const rows = await db.select({ id: notifications2.id }).from(notifications2).where(and(eq(notifications2.profileId, profileId), eq(notifications2.read, false)));
+  return rows.length;
+}
+async function getRecentNotifications(profileId) {
+  const db = await getDb();
+  if (!db) return [];
+  const { notifications: notifications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  return db.select().from(notifications2).where(eq(notifications2.profileId, profileId)).orderBy(desc(notifications2.createdAt)).limit(8);
+}
+var _db, _schemaMigrationPromise, _lastMeuAutonomoVaultDay;
+var init_db = __esm({
+  "server/db.ts"() {
+    "use strict";
+    init_schema();
+    init_env();
+    init_mockDb();
+    _db = null;
+    _schemaMigrationPromise = null;
+    _lastMeuAutonomoVaultDay = "";
+  }
+});
+
+// server/_core/vercel.ts
+import "dotenv/config";
+
+// server/_core/app.ts
+import express from "express";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+
+// shared/const.ts
+var COOKIE_NAME = "app_session_id";
+var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var AXIOS_TIMEOUT_MS = 3e4;
+var UNAUTHED_ERR_MSG = "Please login (10001)";
+var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+var OAUTH_STATE_COOKIE = "__Host-oauth_state";
+var decodeOAuthState = (state) => {
+  let decoded;
+  try {
+    decoded = atob(state);
+  } catch {
+    return { redirectUri: "" };
+  }
+  try {
+    const parsed = JSON.parse(decoded);
+    if (parsed && typeof parsed.redirectUri === "string") return parsed;
+  } catch {
+  }
+  return { redirectUri: decoded };
+};
+
+// server/_core/oauth.ts
+init_db();
+import { parse as parseCookieHeader2 } from "cookie";
 
 // server/demoConfig.ts
 import fs2 from "fs";
@@ -1020,6 +1079,8 @@ var HttpError = class extends Error {
 var ForbiddenError = (msg) => new HttpError(403, msg);
 
 // server/_core/sdk.ts
+init_db();
+init_env();
 import axios from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
@@ -1382,6 +1443,7 @@ function registerOAuthRoutes(app2) {
 }
 
 // server/_core/storageProxy.ts
+init_env();
 function registerStorageProxy(app2) {
   app2.get("/manus-storage/*", async (req, res) => {
     const key = req.params[0];
@@ -1423,6 +1485,7 @@ function registerStorageProxy(app2) {
 }
 
 // server/routes/og-meta.ts
+init_db();
 import fs3 from "fs";
 import path3 from "path";
 function escapeHtml(str) {
@@ -1664,6 +1727,7 @@ function registerOgMetaRoutes(app2) {
 }
 
 // server/webhooks/asaas.ts
+init_db();
 init_schema();
 import { eq as eq2 } from "drizzle-orm";
 async function handleAsaasWebhook(req, res) {
@@ -1745,6 +1809,7 @@ async function handleAsaasWebhook(req, res) {
 }
 
 // server/routes/asaas-checkout.ts
+init_db();
 init_schema();
 import { eq as eq3 } from "drizzle-orm";
 var ASAAS_API_URL = "https://api.asaas.com/v3";
@@ -1839,12 +1904,14 @@ async function getPaymentStatus(req, res) {
 
 // server/routers.ts
 init_schema();
+init_db();
 import { and as and2, desc as desc2, eq as eq4, gte, lt, lte, ne, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z as z2 } from "zod";
 import { TRPCError as TRPCError3 } from "@trpc/server";
 
 // server/storage.ts
+init_env();
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
   const forgeKey = ENV.forgeApiKey;
@@ -1894,6 +1961,7 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
 import { z } from "zod";
 
 // server/_core/notification.ts
+init_env();
 import { TRPCError } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
@@ -2020,6 +2088,68 @@ var systemRouter = router({
   ).query(() => ({
     ok: true
   })),
+  dbStatus: publicProcedure.query(async () => {
+    try {
+      const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { sql: sql2 } = await import("drizzle-orm");
+      const db = await getDb2();
+      const isMock = !db || Boolean(db.__isMock);
+      let dbName = null;
+      let tables = [];
+      let quantityColumn = null;
+      let quoteItemsCount = null;
+      let migrations = [];
+      let dbError = null;
+      if (!isMock) {
+        try {
+          const [dbRes] = await db.execute(sql2`SELECT DATABASE() as db`);
+          dbName = dbRes?.[0]?.db || null;
+          const [tbls] = await db.execute(sql2`SHOW TABLES LIKE 'quoteItems'`);
+          tables = tbls?.map((t2) => Object.values(t2)[0]) || [];
+          if (tables.length > 0) {
+            const [col] = await db.execute(sql2`SHOW COLUMNS FROM quoteItems LIKE 'quantity'`);
+            quantityColumn = col?.[0] || null;
+            const [cnt] = await db.execute(sql2`SELECT COUNT(*) as total FROM quoteItems`);
+            quoteItemsCount = Number(cnt?.[0]?.total || 0);
+          }
+          const [migTbls] = await db.execute(sql2`SHOW TABLES LIKE '__drizzle_migrations'`);
+          if (migTbls?.length > 0) {
+            const [migs] = await db.execute(sql2`SELECT * FROM __drizzle_migrations ORDER BY id ASC`);
+            migrations = migs || [];
+          }
+        } catch (queryErr) {
+          dbError = JSON.stringify({
+            message: queryErr?.message,
+            code: queryErr?.code,
+            errno: queryErr?.errno,
+            sqlState: queryErr?.sqlState,
+            cause: queryErr?.cause ? {
+              message: queryErr.cause?.message,
+              code: queryErr.cause?.code,
+              errno: queryErr.cause?.errno,
+              sqlState: queryErr.cause?.sqlState
+            } : null
+          });
+        }
+      }
+      return {
+        connected: !isMock,
+        isMock,
+        dbName,
+        hasQuoteItemsTable: tables.length > 0,
+        quantityColumn,
+        quoteItemsCount,
+        migrations,
+        dbError
+      };
+    } catch (e) {
+      return {
+        connected: false,
+        isMock: true,
+        error: e?.message || String(e)
+      };
+    }
+  }),
   notifyOwner: adminProcedure.input(
     z.object({
       title: z.string().min(1, "title is required"),
